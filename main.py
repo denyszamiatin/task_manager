@@ -1,9 +1,52 @@
 import collections
 import functools
+import pickle
+import json
+import configparser
 
 import arrow.parser
 
-tasks = collections.defaultdict(list)
+
+config = configparser.ConfigParser()
+config.read('todo.ini')
+format = config['Serializer']['format']
+
+
+def load_pickle():
+    try:
+        with open('tasks.pickle', 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        return collections.defaultdict(list)
+
+
+def save_pickle(obj):
+    with open('tasks.pickle', 'wb') as f:
+        pickle.dump(obj, f)
+
+
+def load_json():
+    try:
+        with open('tasks.json', 'rt') as f:
+            return json.load(f, object_hook=lambda dct: collections.defaultdict(list, dct))
+    except FileNotFoundError:
+        return collections.defaultdict(list)
+
+
+def save_json(obj):
+    with open('tasks.json', 'wt') as f:
+        json.dump(obj, f)
+
+
+if format == 'pickle':
+    load, save = load_pickle, save_pickle
+elif format == 'json':
+    load, save = load_json, save_json
+else:
+    raise ImportError
+
+
+tasks = load()
 
 
 def validate_date(f):
@@ -20,10 +63,11 @@ def validate_date(f):
 @validate_date
 def add(date, task):
     tasks[date].append(task)
+    save(tasks)
 
 
 @validate_date
-def list(date):
+def list_(date):
     if date in tasks and tasks[date]:
         return [(index, task) for index, task in enumerate(tasks[date], 1)]
     else:
@@ -36,6 +80,7 @@ def delete(date, number):
         tasks[date].pop(int(number) - 1)
     except (KeyError, IndexError, ValueError):
         raise ValueError("Incorrect input")
+    save(tasks)
 
 
 def add_task():
@@ -46,7 +91,7 @@ def add_task():
 
 def list_tasks():
     date = input("Date?")
-    for index, task in list(date):
+    for index, task in list_(date):
         print("{}. {}".format(index, task))
 
 
